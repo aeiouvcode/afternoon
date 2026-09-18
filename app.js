@@ -200,6 +200,7 @@ async function send(){
   state.history.push({role:'user',content:text});save();
   const bubble=addMsg('assistant','',true);
   let full='';
+  bubble.textContent='Contacting '+cfg.name+'…';
   try{
     const headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
     if(p==='openrouter'){headers['HTTP-Referer']=location.href;headers['X-Title']='Afternoon'}
@@ -223,7 +224,7 @@ async function send(){
     save();
   }catch(e){
     bubble.classList.add('error');
-    bubble.textContent='Could not reach the model. '+(e.message||'');
+    bubble.textContent=p==='tokenharbor'?'Token Harbor sends no browser CORS headers, so the server blocks direct calls from this app. Switch to OpenRouter for the working path.':'Could not reach OpenRouter. '+(e.message||'Check the key or connection.');
   }finally{
     bubble.classList.remove('cursor');busy=false;$('#send').disabled=false;$('#input').focus();
   }
