@@ -25,15 +25,19 @@ in plaintext.
 - `Referrer-Policy: no-referrer` via meta.
 - Input length caps and validation throughout; rendered content is escaped.
 
-## Optional encryption at rest (E2EE)
+## Encryption at rest by default (E2EE)
 
-Opt in from the context panel. AES-GCM-256 for memory, tasks, chat history and
-API keys; key derived with PBKDF2-SHA256 at 310,000 iterations. The passphrase
-is never stored; a lock screen greets every reload; exports stay encrypted and
-can only be re-imported with the passphrase.
+New users create a passphrase during onboarding, before any provider key or other
+data is stored. AES-GCM-256 protects memory, tasks, chat history and API keys;
+the key is derived with PBKDF2-SHA256 at 310,000 iterations. The passphrase is
+never stored; a lock screen greets every reload; exports stay encrypted and can
+only be re-imported with the passphrase. Existing plaintext installs are detected
+and offered an in-place migration. Plaintext is removed only after the encrypted
+vault has been written successfully.
 
 ## Pre-push secret scan
 
 Run `./scan.sh` before every push. It refuses the push when anything shaped
 like a real credential (Token Harbor keys, `sk-` API keys, GitHub PATs, bearer
 tokens, hardcoded password assignments) appears in tracked files.
+
