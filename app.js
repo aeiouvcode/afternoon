@@ -24,7 +24,7 @@ const b64e=b=>btoa(String.fromCharCode(...b));
 const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>e.classList.remove('show'),1800)}
 
-/* ---------- persistence (plaintext or AES-GCM vault) ---------- */
+/* ---------- persistence (AES-GCM vault by default; plaintext only by explicit opt-out) ---------- */
 const encOn=()=>localStorage.getItem(LS+'enc')==='1';
 let saveChain=Promise.resolve();
 function save(){saveChain=saveChain.then(persist).catch(()=>toast('Could not save'))}
@@ -239,10 +239,11 @@ function askPass(opts){
     $('#passTitle').textContent=opts.title;
     $('#passHelp').textContent=opts.help||'';
     $('#pass2').hidden=!opts.confirm;
+    $('#passCancel').hidden=opts.cancel===false;
     $('#passOk').textContent=opts.okLabel||'OK';
     $('#passErr').textContent='';$('#pass1').value='';$('#pass2').value='';
     $('#passModal').hidden=false;setTimeout(()=>$('#pass1').focus(),60);
-    const done=v=>{$('#passModal').hidden=true;$('#passOk').onclick=null;$('#passCancel').onclick=null;res(v)};
+    const done=v=>{$('#passModal').hidden=true;$('#passCancel').hidden=false;$('#passOk').onclick=null;$('#passCancel').onclick=null;res(v)};
     $('#passOk').onclick=()=>{
       const p1=$('#pass1').value;
       if(p1.length<CAPS.passMin||p1.length>CAPS.passMax){$('#passErr').textContent='Passphrase must be 8-128 characters.';return}
@@ -278,14 +279,43 @@ function applyImport(s){
 }
 
 /* ---------- boot & wiring ---------- */
+async function enableEncryption(pass){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const key=await deriveKey(pass,salt);
+  const priorState=localStorage.getItem(LS+'state');
+  localStorage.setItem(LS+'vault',JSON.stringify({v:1,kdf:'PBKDF2-SHA256',iter:310000,salt:b64e(salt),iv:'',data:''}));
+  localStorage.setItem(LS+'enc','1');
+  vaultKey=key;
+  try{
+    await persist();
+    localStorage.removeItem(LS+'state');
+    renderEncUI();toast('Protected with encryption');
+    return true;
+  }catch(e){
+    localStorage.removeItem(LS+'vault');localStorage.removeItem(LS+'enc');
+    if(priorState!==null)localStorage.setItem(LS+'state',priorState);
+    vaultKey=null;toast('Could not enable encryption');
+    return false;
+  }
+}
+async function offerDefaultEncryption(hasPlaintext){
+  const pass=await askPass({
+    title:hasPlaintext?'Protect your existing data':'Protect your Afternoon',
+    help:hasPlaintext?'Afternoon found data saved by an earlier version. Set a passphrase to migrate it into the encrypted vault. Nothing is deleted until encryption succeeds.':'Encryption is on by default. Set a passphrase to protect memory, tasks, chat history and provider keys on this device. Your passphrase never leaves this browser and cannot be recovered.',
+    confirm:true,okLabel:hasPlaintext?'Encrypt & migrate':'Start encrypted',cancel:hasPlaintext
+  });
+  if(pass)await enableEncryption(pass);
+}
 function boot(){
   if(encOn()){
     $('#lock').hidden=false;
     setTimeout(()=>$('#lockPass').focus(),60);
   }else{
+    const hasPlaintext=localStorage.getItem(LS+'state')!==null||['memory','tasks','history','key','model'].some(k=>localStorage.getItem(LS+k)!==null);
     state=loadPlaintext();
-    if(!localStorage.getItem(LS+'state')&&(state.memory.length||state.tasks.length||state.history.length||state.keys.openrouter))save();
+    if(hasPlaintext&&!localStorage.getItem(LS+'state'))localStorage.setItem(LS+'state',JSON.stringify(state));
     hydrateUI();
+    setTimeout(()=>offerDefaultEncryption(hasPlaintext),80);
   }
 }
 
@@ -325,13 +355,7 @@ $('#encToggle').addEventListener('click',async()=>{
   if(!encOn()){
     const pass=await askPass({title:'Set a passphrase',help:'Encrypts memory, tasks, chat history and keys on this device. There is no recovery: lose the passphrase, lose the data.',confirm:true,okLabel:'Enable'});
     if(!pass)return;
-    const salt=crypto.getRandomValues(new Uint8Array(16));
-    vaultKey=await deriveKey(pass,salt);
-    localStorage.setItem(LS+'vault',JSON.stringify({v:1,kdf:'PBKDF2-SHA256',iter:310000,salt:b64e(salt),iv:'',data:''}));
-    localStorage.setItem(LS+'enc','1');
-    localStorage.removeItem(LS+'state');
-    save();await saveChain;
-    renderEncUI();toast('Encryption on');
+    await enableEncryption(pass);
   }else{
     approve('Turn encryption off? Data stays on this device but is stored as plaintext.',async()=>{
       localStorage.setItem(LS+'state',JSON.stringify(state));
@@ -398,3 +422,4 @@ document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',
 $('#menu').addEventListener('click',()=>$('#rail').classList.toggle('open'));
 $('#closeContext').addEventListener('click',()=>$('#context').classList.remove('open'));
 boot();
+
