@@ -92,7 +92,7 @@ function renderAgentState(){
   $('#agentState').innerHTML='<b>●</b> '+(open?open+' OPEN':'READY');
 }
 function cleanNimEndpoint(value){
-  try{const u=new URL(String(value).trim());if(u.protocol==='https:'||(u.protocol==='http:'&&(u.hostname==='localhost'||u.hostname==='127.0.0.1')))return u.href.replace(/\/$/,'')}catch{}
+  try{const u=new URL(String(value).trim());if((u.protocol==='https:'||u.protocol==='http:')&&u.hostname==='localhost')return u.href.replace(/\/$/,'')}catch{}
   return '';
 }
 function providerEndpoint(p){return p==='nim'?(cleanNimEndpoint(state.endpoints.nim)||PROVIDERS.nim.endpoint):PROVIDERS[p].endpoint}
@@ -118,7 +118,7 @@ function renderProvider(){
   document.querySelectorAll('.provtab').forEach(b=>b.classList.toggle('active',b.dataset.provider===p));
   $('#provName').textContent=cfg.name.toUpperCase();
   $('#apiKey').placeholder=cfg.placeholder;
-  $('#keyHelp').innerHTML=p==='nim'?'Hosted <code>nvapi-</code> keys are browser-locked. Use a <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">self-hosted NIM</a> endpoint on localhost or your LAN. The key is sent only there.':'Stored on this device only. Sent only to <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">'+cfg.helpHost+'</a>.';
+  $('#keyHelp').innerHTML=p==='nim'?'Hosted <code>nvapi-</code> keys are browser-locked. Use a <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">self-hosted NIM</a> endpoint on localhost. The key is sent only there.':'Stored on this device only. Sent only to <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">'+cfg.helpHost+'</a>.';
   $('#endpointRow').hidden=p!=='nim';
   if(p==='nim')$('#endpoint').value=state.endpoints.nim;
 }
@@ -366,7 +366,7 @@ $('#saveKey').addEventListener('click',async()=>{
 });
 $('#endpoint').addEventListener('change',()=>{
   const v=cleanNimEndpoint($('#endpoint').value);
-  if(!v){toast('Use HTTPS, or localhost for a self-hosted NIM');$('#endpoint').value=state.endpoints.nim;return}
+  if(!v){toast('Use an http://localhost or https://localhost NIM endpoint');$('#endpoint').value=state.endpoints.nim;return}
   state.endpoints.nim=v;save();renderProvider();
 });
 $('#memoryItems').addEventListener('click',e=>{
