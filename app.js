@@ -105,7 +105,12 @@ function friendlyProviderError(status){
 }
 async function validateNim(key){
   const base=providerEndpoint('nim'),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
-  const probe=await fetch(base+'/chat/completions',{method:'POST',headers,body:JSON.stringify({model:state.models.nim,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:1,stream:false})});
+  let probe;
+  try{
+    probe=await fetch(base+'/chat/completions',{method:'POST',headers,body:JSON.stringify({model:state.models.nim,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:1,stream:false})});
+  }catch(e){
+    throw new Error('Could not reach '+base+' - is your NIM container running? Start it, then try again.');
+  }
   if(!probe.ok)throw new Error(friendlyProviderError(probe.status));
 }
 function renderProvider(){
