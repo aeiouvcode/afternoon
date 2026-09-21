@@ -39,3 +39,5 @@
 .approvebar button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 11px;font-size:11px}
 #approveYes{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
 @media(max-width:720px){.approvebar{bottom:86px;font-size:11px}}
+
+.endpointrow{display:block;margin-top:10px}.endpointrow span{display:block;margin-bottom:5px;font:9px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;color:var(--muted)}.endpointrow input{width:100%;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11px}.endpointrow input:focus{outline:1px solid var(--acid);border-color:var(--acid)}
