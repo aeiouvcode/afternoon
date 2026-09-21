@@ -11,7 +11,7 @@ and chat history live in your browser only. Hosted on GitHub Pages.
   Free models first (`deepseek-v4.1-flash:free`, `mimo-v2.5:free`), then
   `muse-spark-1-3`, `kimi-k3`, `glm-5.3-flash`, `gemini-3.8-flash`.
 - **OpenRouter** — `https://openrouter.ai/api/v1/chat/completions`.
-- **NVIDIA NIM** — self-hosted NIM at an editable localhost/LAN `/v1` endpoint. Hosted `nvapi-` keys are browser-locked: the documented host is CORS-restricted and NVCF does not expose the hosted catalog/chat path. A one-token completion validates the local endpoint and key before it is stored.
+- **NVIDIA NIM** — self-hosted NIM at an editable localhost `/v1` endpoint. Hosted `nvapi-` keys are browser-locked: the documented host is CORS-restricted and NVCF does not expose the hosted catalog/chat path. A one-token completion validates the local endpoint and key before it is stored.
 
 Keys are stored per provider, on this device only, and sent only to that
 provider's endpoint. Keys are never logged, embedded in the page, or exported
