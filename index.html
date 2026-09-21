@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://tokenharbor.ai https://openrouter.ai; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src https://tokenharbor.ai https://openrouter.ai http://localhost:* https://localhost:*; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; manifest-src 'self'">
 <title>Afternoon — a personal agent, built in one.</title>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -23,10 +23,12 @@
     <div class="provrow">
       <button class="provtab active" data-provider="tokenharbor">Token Harbor</button>
       <button class="provtab" data-provider="openrouter">OpenRouter</button>
+      <button class="provtab" data-provider="nim">NVIDIA NIM</button>
     </div>
     <div class="keytop"><span class="eyebrow" id="provName">TOKEN HARBOR</span><span class="status" id="keyStatus">NO KEY</span></div>
     <div class="keyrow"><input id="apiKey" type="password" placeholder="thk_live_…" autocomplete="off" maxlength="200"><button class="iconbtn" id="saveKey">Save</button></div>
     <div class="keyhelp" id="keyHelp">Stored on this device only. Sent only to tokenharbor.ai.</div>
+    <label class="endpointrow" id="endpointRow" hidden><span>ENDPOINT</span><input id="endpoint" type="url" value="http://localhost:8000/v1" autocomplete="off" maxlength="300"></label>
     <select class="model" id="model"></select>
   </div>
 </aside>
