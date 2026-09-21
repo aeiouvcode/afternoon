@@ -14,9 +14,11 @@ const PROVIDERS={
     {id:'google/gemini-2.5-flash',label:'Gemini 2.5 Flash'},
     {id:'openai/gpt-4.1-mini',label:'GPT-4.1 mini'},
     {id:'anthropic/claude-haiku-4.5',label:'Claude Haiku 4.5'},
-    {id:'moonshotai/kimi-k2',label:'Kimi K2'}]}
+    {id:'moonshotai/kimi-k2',label:'Kimi K2'}]},
+  nim:{name:'NVIDIA NIM',endpoint:'http://localhost:8000/v1',placeholder:'nvapi-…',helpHost:'self-hosted NIM',helpUrl:'https://docs.nvidia.com/nim/',models:[
+    {id:'meta/llama-3.1-8b-instruct',label:'Llama 3.1 8B Instruct'}]}
 };
-const DEFAULT_STATE=()=>({provider:'tokenharbor',keys:{tokenharbor:'',openrouter:''},models:{tokenharbor:'deepseek-v4.1-flash:free',openrouter:'google/gemini-2.5-flash'},memory:[],tasks:[],history:[]});
+const DEFAULT_STATE=()=>({provider:'tokenharbor',keys:{tokenharbor:'',openrouter:'',nim:''},models:{tokenharbor:'deepseek-v4.1-flash:free',openrouter:'google/gemini-2.5-flash',nim:'meta/llama-3.1-8b-instruct'},endpoints:{nim:'http://localhost:8000/v1'},memory:[],tasks:[],history:[]});
 let state=DEFAULT_STATE(),vaultKey=null,busy=false,approveCb=null;
 
 const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,7 +50,8 @@ function normalizeState(s){
   if(!s||typeof s!=='object')return d;
   if(PROVIDERS[s.provider])d.provider=s.provider;
   if(s.keys&&typeof s.keys==='object'){for(const p in PROVIDERS){const v=s.keys[p];d.keys[p]=typeof v==='string'?v.slice(0,CAPS.key):''}}
-  if(s.models&&typeof s.models==='object'){for(const p in PROVIDERS){const v=s.models[p];if(PROVIDERS[p].models.some(m=>m.id===v))d.models[p]=v}}
+  if(s.models&&typeof s.models==='object'){for(const p in PROVIDERS){const v=s.models[p];if(typeof v==='string'&&v.length<200&&(p==='nim'||PROVIDERS[p].models.some(m=>m.id===v)))d.models[p]=v}}
+  if(s.endpoints&&typeof s.endpoints.nim==='string'){const u=cleanNimEndpoint(s.endpoints.nim);if(u)d.endpoints.nim=u}
   d.memory=(Array.isArray(s.memory)?s.memory:[]).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.slice(0,CAPS.memory)).slice(0,CAPS.maxMemory);
   d.tasks=(Array.isArray(s.tasks)?s.tasks:[]).filter(t=>t&&typeof t.text==='string'&&t.text.trim()).map(t=>({text:t.text.slice(0,CAPS.task),due:typeof t.due==='string'?t.due.slice(0,60):'',done:!!t.done,id:typeof t.id==='string'?t.id:Math.random().toString(36).slice(2,10)})).slice(0,CAPS.maxTasks);
   d.history=(Array.isArray(s.history)?s.history:[]).filter(m=>m&&(m.role==='user'||m.role==='assistant')&&typeof m.content==='string').map(m=>({role:m.role,content:m.content.slice(0,CAPS.chat*4)})).slice(-CAPS.maxHistory);
@@ -88,12 +91,31 @@ function renderAgentState(){
   const open=state.tasks.filter(t=>!t.done).length;
   $('#agentState').innerHTML='<b>●</b> '+(open?open+' OPEN':'READY');
 }
+function cleanNimEndpoint(value){
+  try{const u=new URL(String(value).trim());if(u.protocol==='https:'||(u.protocol==='http:'&&(u.hostname==='localhost'||u.hostname==='127.0.0.1')))return u.href.replace(/\/$/,'')}catch{}
+  return '';
+}
+function providerEndpoint(p){return p==='nim'?(cleanNimEndpoint(state.endpoints.nim)||PROVIDERS.nim.endpoint):PROVIDERS[p].endpoint}
+function friendlyProviderError(status){
+  if(status===401||status===403)return 'That key was not accepted. Check the NVIDIA NIM key and try again.';
+  if(status===404)return 'That model or endpoint was not found.';
+  if(status===429)return 'NVIDIA NIM is busy or the account limit was reached. Try again shortly.';
+  if(status>=500)return 'NVIDIA NIM is having trouble right now. Try again shortly.';
+  return 'Could not connect to NVIDIA NIM. Check the key, model, endpoint, and connection.';
+}
+async function validateNim(key){
+  const base=providerEndpoint('nim'),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
+  const probe=await fetch(base+'/chat/completions',{method:'POST',headers,body:JSON.stringify({model:state.models.nim,messages:[{role:'user',content:'Reply with OK.'}],max_tokens:1,stream:false})});
+  if(!probe.ok)throw new Error(friendlyProviderError(probe.status));
+}
 function renderProvider(){
   const p=state.provider,cfg=PROVIDERS[p];
   document.querySelectorAll('.provtab').forEach(b=>b.classList.toggle('active',b.dataset.provider===p));
   $('#provName').textContent=cfg.name.toUpperCase();
   $('#apiKey').placeholder=cfg.placeholder;
-  $('#keyHelp').innerHTML='Stored on this device only. Sent only to <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">'+cfg.helpHost+'</a>.';
+  $('#keyHelp').innerHTML=p==='nim'?'Hosted <code>nvapi-</code> keys are browser-locked. Use a <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">self-hosted NIM</a> endpoint on localhost or your LAN. The key is sent only there.':'Stored on this device only. Sent only to <a href="'+cfg.helpUrl+'" target="_blank" rel="noopener">'+cfg.helpHost+'</a>.';
+  $('#endpointRow').hidden=p!=='nim';
+  if(p==='nim')$('#endpoint').value=state.endpoints.nim;
 }
 function renderModelOptions(){
   const p=state.provider,cfg=PROVIDERS[p],sel=$('#model');
@@ -204,8 +226,8 @@ async function send(){
   try{
     const headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
     if(p==='openrouter'){headers['HTTP-Referer']=location.href;headers['X-Title']='Afternoon'}
-    const r=await fetch(cfg.endpoint,{method:'POST',headers,body:JSON.stringify({model:state.models[p],stream:true,max_tokens:1200,messages:[{role:'system',content:systemPrompt()},...state.history.slice(-18)]})});
-    if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error?.message||(cfg.name+' returned '+r.status));
+    const r=await fetch(providerEndpoint(p)+(p==='nim'?'/chat/completions':''),{method:'POST',headers,body:JSON.stringify({model:state.models[p],stream:true,max_tokens:1200,messages:[{role:'system',content:systemPrompt()},...state.history.slice(-18)]})});
+    if(!r.ok){if(p==='nim')throw new Error(friendlyProviderError(r.status));throw new Error(cfg.name+' returned '+r.status)}
     const reader=r.body.getReader(),dec=new TextDecoder();let buf='';
     while(true){
       const {done,value}=await reader.read();if(done)break;
@@ -224,7 +246,7 @@ async function send(){
     save();
   }catch(e){
     bubble.classList.add('error');
-    bubble.textContent=p==='tokenharbor'?'Token Harbor sends no browser CORS headers, so the server blocks direct calls from this app. Switch to OpenRouter for the working path.':'Could not reach OpenRouter. '+(e.message||'Check the key or connection.');
+    bubble.textContent=p==='tokenharbor'?'Token Harbor sends no browser CORS headers, so the server blocks direct calls from this app. Switch to OpenRouter or NVIDIA NIM for a working browser path.':p==='nim'?(e.message||'Could not connect to NVIDIA NIM. Check the key, model, endpoint, and connection.'):'Could not reach OpenRouter. Check the key or connection.';
   }finally{
     bubble.classList.remove('cursor');busy=false;$('#send').disabled=false;$('#input').focus();
   }
@@ -323,14 +345,24 @@ document.querySelectorAll('.provtab').forEach(b=>b.addEventListener('click',()=>
   state.provider=b.dataset.provider;save();renderProvider();renderModelOptions();renderKeyUI();
 }));
 $('#model').addEventListener('change',()=>{state.models[state.provider]=$('#model').value;save()});
-$('#saveKey').addEventListener('click',()=>{
-  const v=$('#apiKey').value.trim().slice(0,CAPS.key);
+$('#saveKey').addEventListener('click',async()=>{
+  const p=state.provider,v=$('#apiKey').value.trim().slice(0,CAPS.key),btn=$('#saveKey');
   if(v){
     if(!/^[\x21-\x7E]{8,200}$/.test(v)){toast('That does not look like a key');return}
-    state.keys[state.provider]=v;$('#apiKey').value='';save();renderKeyUI();toast('Key saved locally');
+    btn.disabled=true;btn.textContent=p==='nim'?'Testing…':'Saving…';
+    try{
+      if(p==='nim')await validateNim(v);
+      state.keys[p]=v;$('#apiKey').value='';save();renderKeyUI();toast(p==='nim'?'NVIDIA NIM connected':'Key saved locally');
+    }catch(e){toast(e.message||'Could not validate this key');renderKeyUI()}
+    finally{btn.disabled=false}
   }else{
-    state.keys[state.provider]='';save();renderKeyUI();toast('Key removed');
+    state.keys[p]='';save();renderKeyUI();toast('Key removed');
   }
+});
+$('#endpoint').addEventListener('change',()=>{
+  const v=cleanNimEndpoint($('#endpoint').value);
+  if(!v){toast('Use HTTPS, or localhost for a self-hosted NIM');$('#endpoint').value=state.endpoints.nim;return}
+  state.endpoints.nim=v;save();renderProvider();
 });
 $('#memoryItems').addEventListener('click',e=>{
   const b=e.target.closest('[data-mem-del]');if(!b)return;
