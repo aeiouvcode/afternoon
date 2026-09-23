@@ -1,6 +1,10 @@
-# afternoon
+# Afternoon
 
-Afternoon — a personal agent, built in one.
+A personal agent, built in one.
+
+![Afternoon workspace](docs/screenshot.jpg)
+
+**Live:** https://aeiouvcode.github.io/afternoon/
 
 A static, single-page personal agent. Bring your own model key; memory, tasks
 and chat history live in your browser only. Hosted on GitHub Pages.
@@ -41,4 +45,3 @@ vault has been written successfully.
 Run `./scan.sh` before every push. It refuses the push when anything shaped
 like a real credential (Token Harbor keys, `sk-` API keys, GitHub PATs, bearer
 tokens, hardcoded password assignments) appears in tracked files.
-
